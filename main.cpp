@@ -1,12 +1,13 @@
 #include <iostream>
 #include <vector>
+#include <unordered_set>
 
 class City;
 
-struct CityConnection
+struct CityRoute
 {
 	int cost { 0 };
-	City* city { nullptr };
+	City* destination { nullptr };
 };
 
 class City
@@ -16,22 +17,21 @@ public:
 
 	void connect_to( City* city, int cost )
 	{
-		CityConnection connection;
-		connection.city = city;
-		connection.cost = cost;
-		connections.push_back( connection );
+		CityRoute route;
+		route.destination = city;
+		route.cost = cost;
+		routes.push_back( route );
 	}
-
 	void print_connections()
 	{
 		std::cout << name << ": ";
 
-		for ( auto itr = connections.begin(); itr != connections.end(); itr++ )
+		for ( auto itr = routes.begin(); itr != routes.end(); itr++ )
 		{
-			CityConnection connection = (*itr);
-			std::cout << connection.city->name << "(" << connection.cost << ")";
+			CityRoute route = (*itr);
+			std::cout << route.destination->name << "(" << route.cost << ")";
 
-			if ( itr + 1 != connections.end() )
+			if ( itr + 1 != routes.end() )
 			{
 				std::cout << ", ";
 			}
@@ -40,9 +40,10 @@ public:
 		std::cout << std::endl;
 	}
 
+	std::vector<CityRoute> routes;
+
 private:
 	std::string name;
-	std::vector<CityConnection> connections;
 };
 
 class World
@@ -65,14 +66,57 @@ struct WorldTrip
 	std::vector<City*> path;
 };
 
+struct WorldTripContext
+{
+	WorldTripContext( City* origin, World* world ) 
+		: origin( origin )
+	{
+		for ( City* city : world->cities )
+		{
+			if ( city == origin ) continue;
+			cities.insert( city );
+		}
+	}
+
+	int cost { 0 };                    //  current cost
+	std::unordered_set<City*> cities;  //  locations to visit
+	City* origin;                      //  origin city & destination
+};
+
 class Traveller
 {
 public:
 	Traveller( std::string name ) : name( name ) {}
 
-	WorldTrip find_less_expensive_world_trip( City* origin, World* world )
+	WorldTrip find_less_expensive_world_trip( WorldTripContext ctx )
 	{
 		WorldTrip trip;
+
+		bool is_finished = ctx.cities.empty();
+
+		for ( auto itr = ctx.origin->routes.begin(); itr != ctx.origin->routes.end(); itr++ )
+		{
+			CityRoute& route = (*itr);
+
+			//  find our way back to origin
+			if ( is_finished )
+			{
+				if ( route.destination == ctx.origin )
+				{
+					trip.cost = ctx.cost;
+					break;
+				}
+
+				continue;
+			}
+
+			//  
+			WorldTripContext next_ctx = ctx;
+			next_ctx.cost += route.cost;
+			next_ctx.cities.erase( route.destination );
+			find_less_expensive_world_trip( next_ctx );
+		}
+
 		return trip;
 	}
 
@@ -129,6 +173,5 @@ int main()
 
 	//  preparing the world trip
 	Traveller traveller( "Hannibal Barca" );
-	traveller.find_less_expensive_world_trip( &A, &world );
-
+	traveller.find_less_expensive_world_trip( WorldTripContext( &D, &world ) );
 }
