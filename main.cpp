@@ -24,21 +24,18 @@ public:
 	}
 	void print_connections()
 	{
-		std::cout << name << ": ";
+		std::cout << name << " connected to ";
 
 		for ( auto itr = routes.begin(); itr != routes.end(); itr++ )
 		{
 			CityRoute route = (*itr);
-			std::cout << route.destination->name << "(" << route.cost << ")";
-
-			if ( itr + 1 != routes.end() )
-			{
-				std::cout << ", ";
-			}
+			std::cout << route.destination->name << "(" << route.cost << ")" << ( itr + 1 != routes.end() ? ", " : "" );
 		}
 
 		std::cout << std::endl;
 	}
+
+	std::string get_name() { return name; }
 
 	std::vector<CityRoute> routes;
 
@@ -64,6 +61,7 @@ struct WorldTrip
 {
 	int cost { 0 };
 	std::vector<City*> path;
+	City* origin { nullptr };
 };
 
 struct WorldTripContext
@@ -71,16 +69,31 @@ struct WorldTripContext
 	WorldTripContext( City* origin, World* world ) 
 		: origin( origin )
 	{
+		//  add locations
 		for ( City* city : world->cities )
 		{
-			if ( city == origin ) continue;
-			cities.insert( city );
+			if ( city == origin ) continue;  //  ignore origin
+			locations.insert( city );
 		}
+
+		//  initialize path
+		path.push_back( origin );
 	}
 
-	int cost { 0 };                    //  current cost
-	std::unordered_set<City*> cities;  //  locations to visit
-	City* origin;                      //  origin city & destination
+	void print()
+	{
+		std::cout << "World Trip ";
+		for ( auto itr = path.begin(); itr != path.end(); itr++ )
+		{
+			std::cout << (*itr)->get_name() << ( itr + 1 != path.end() ? " - " : "" );
+		}
+		std::cout << " (cost " << cost << ")" << std::endl;
+	}
+
+	int cost { 0 };                       //  current cost
+	std::unordered_set<City*> locations;  //  locations still to visit
+	std::vector<City*> path;              //  computing path
+	City* origin;                         //  origin city & destination
 };
 
 class Traveller
@@ -90,31 +103,85 @@ public:
 
 	WorldTrip find_less_expensive_world_trip( WorldTripContext ctx )
 	{
-		WorldTrip trip;
+		std::cout << "Finding World Trip from " << ctx.origin->get_name() << std::endl;
 
-		bool is_finished = ctx.cities.empty();
+		std::vector<WorldTripContext> possibilities, plans;
+		possibilities.push_back( ctx );
 
-		for ( auto itr = ctx.origin->routes.begin(); itr != ctx.origin->routes.end(); itr++ )
+		//  find all trips possible
+		while ( !possibilities.empty() )
 		{
-			CityRoute& route = (*itr);
+			//std::cout << "Possibilities: " << possibilities.size() << " | Plans: " << plans.size() << std::endl;
 
-			//  find our way back to origin
-			if ( is_finished )
+			//  get current context
+			WorldTripContext current_ctx = possibilities[0];
+			possibilities.erase( possibilities.begin() );
+
+			City* city = *( current_ctx.path.end() - 1 );
+
+			bool is_finished = current_ctx.locations.empty();
+			for ( auto itr = city->routes.begin(); itr != city->routes.end(); itr++ )
 			{
-				if ( route.destination == ctx.origin )
+				CityRoute& route = (*itr);
+
+				//  find our way back to origin
+				if ( is_finished )
 				{
-					trip.cost = ctx.cost;
-					break;
+					if ( route.destination == ctx.origin )
+					{
+						current_ctx.cost += route.cost;
+						current_ctx.path.push_back( route.destination );
+						plans.push_back( current_ctx );
+
+						//std::cout << "- new plan" << std::endl;
+						break;
+					}
+
+					continue;
 				}
 
-				continue;
+				//  prevent going multiple times to the same city
+				if ( current_ctx.locations.find( route.destination ) == current_ctx.locations.end() ) continue;
+
+				//  add possibility
+				WorldTripContext next_ctx = current_ctx;
+				next_ctx.cost += route.cost;
+				next_ctx.locations.erase( route.destination );
+				next_ctx.path.push_back( route.destination );
+				possibilities.push_back( next_ctx );
+
+				//std::cout << "- new possibility" << std::endl;
+			}
+		}
+
+		std::cout << "Found Plans: " << plans.size() << std::endl;
+
+		//  find the less expensive trip
+		WorldTripContext* cheapest_trip { nullptr };
+		for ( WorldTripContext& plan : plans )
+		{
+			if ( cheapest_trip == nullptr || plan.cost < cheapest_trip->cost )
+			{
+				cheapest_trip = &plan;
 			}
 
-			//  
-			WorldTripContext next_ctx = ctx;
-			next_ctx.cost += route.cost;
-			next_ctx.cities.erase( route.destination );
-			find_less_expensive_world_trip( next_ctx );
+			plan.print();
+		}
+
+		//  return world trip
+		WorldTrip trip;
+		if ( cheapest_trip != nullptr )
+		{
+			trip.cost = cheapest_trip->cost;
+			trip.path = cheapest_trip->path;
+			trip.origin = cheapest_trip->origin;
+
+			std::cout << "Recommended:" << std::endl;
+			cheapest_trip->print();
+		}
+		else
+		{
+			std::cout << "Couldn't find a trip! Check that your visiting locations are connected!" << std::endl;
 		}
 
 		return trip;
@@ -172,6 +239,10 @@ int main()
 	std::cout << std::endl;
 
 	//  preparing the world trip
-	Traveller traveller( "Hannibal Barca" );
-	traveller.find_less_expensive_world_trip( WorldTripContext( &D, &world ) );
+	Traveller traveller( "Tom" );
+	for ( City* city : world.cities )
+	{
+		traveller.find_less_expensive_world_trip( WorldTripContext( city, &world ) );
+		std::cout << std::endl;
+	}
 }
