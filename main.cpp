@@ -176,7 +176,7 @@ public:
 			trip.path = cheapest_trip->path;
 			trip.origin = cheapest_trip->origin;
 
-			std::cout << "Recommended:" << std::endl;
+			std::cout << "Recommended to " << name << ":" << std::endl;
 			cheapest_trip->print();
 		}
 		else
