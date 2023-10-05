@@ -101,7 +101,7 @@ class Traveller
 public:
 	Traveller( std::string name ) : name( name ) {}
 
-	WorldTrip find_less_expensive_world_trip( WorldTripContext ctx )
+	WorldTrip find_cheapest_world_trip_from( WorldTripContext ctx )
 	{
 		std::cout << "Finding World Trip from " << ctx.origin->get_name() << std::endl;
 
@@ -242,7 +242,7 @@ int main()
 	Traveller traveller( "Tom" );
 	for ( City* city : world.cities )
 	{
-		traveller.find_less_expensive_world_trip( WorldTripContext( city, &world ) );
+		traveller.find_cheapest_world_trip_from( WorldTripContext( city, &world ) );
 		std::cout << std::endl;
 	}
 }
